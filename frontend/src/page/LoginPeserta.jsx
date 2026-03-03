@@ -10,8 +10,9 @@ import {
   FaClock,
   FaHourglassStart // [BARU] Import icon untuk status belum mulai
 } from "react-icons/fa";
+import StatusUjian from "../component/statusujian";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 const defaultBgPeserta = "bg-gray-50";
 
 const LoginPeserta = () => {
@@ -31,6 +32,7 @@ const LoginPeserta = () => {
   // [BARU] State untuk Modal Ujian BELUM DIMULAI
   const [showNotStartedModal, setShowNotStartedModal] = useState(false);
   const [notStartedDetails, setNotStartedDetails] = useState(null);
+  const [popup, setPopup] = useState({ isOpen: false, message: "" });
 
   // Helper: Format Tanggal Indonesia
   const formatIndoDate = (dateStr) => {
@@ -182,6 +184,17 @@ const LoginPeserta = () => {
             localStorage.clear();
             return;
          }
+
+         // [BARU] Cek apakah error karena sesi harian ditutup
+         if (data.code === 'EXAM_CLOSED_SESSION') {
+             setPopup({
+                 isOpen: true,
+                 message: data.message
+             });
+             setLoading(false);
+             localStorage.clear();
+             return;
+         }
          
          // Error lain (salah password, kuota habis, dll)
          throw new Error(data.message || "Gagal login.");
@@ -220,6 +233,11 @@ const LoginPeserta = () => {
 
   return (
     <div className={`flex-1 flex items-center justify-center px-4 ${bgClass}`} style={bgStyle}>
+      <StatusUjian
+        isOpen={popup.isOpen}
+        message={popup.message}
+        onClose={() => setPopup({ isOpen: false, message: "" })}
+      />
       <div className="w-full max-w-md bg-white shadow-xl rounded-2xl border border-gray-200 p-7">
         <h1 className="text-xl font-bold text-gray-900 mb-1">Login Peserta</h1>
         <p className="text-sm text-gray-500 mb-6">

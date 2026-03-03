@@ -10,7 +10,7 @@ import {
     FaCheckCircle
 } from "react-icons/fa";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 
 // ===============================================
 // KOMPONEN MODAL (Sama seperti di DaftarSoal)

@@ -17,7 +17,7 @@ import {
 import { jwtDecode } from "jwt-decode";
 import DaftarAdmin from "./DaftarAdmin"; 
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 
 /** Komponen notifikasi di Parent (untuk form) */
 const MemoizedMessage = ({ type, text, onDismiss }) => {

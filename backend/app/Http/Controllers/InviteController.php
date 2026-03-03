@@ -235,6 +235,15 @@ class InviteController extends Controller
                     'data' => $exam // Kirim data agar popup bisa menampilkan nama & waktu
                 ], 403);
             }
+            // 3. Cek Jam Aktif Sesi (Mencegah login di luar jam ujian)
+            $currentTime = $now->format('H:i:s');
+            if ($currentTime < $exam->jam_mulai || $currentTime > $exam->jam_berakhir) {
+                return response()->json([
+                    'message' => "Sesi ujian saat ini ditutup. Akses dibuka pukul: " . $exam->jam_mulai . " - " . $exam->jam_berakhir . " WIB",
+                    'code' => 'EXAM_CLOSED_SESSION',
+                    'data' => $exam
+                ], 403);
+            }
         }
 
         // Cek kuota login

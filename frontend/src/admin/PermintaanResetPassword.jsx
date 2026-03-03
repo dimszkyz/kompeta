@@ -13,7 +13,7 @@ import {
   FaWhatsapp,
 } from "react-icons/fa";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 const GET_REQUESTS_ENDPOINT = "/api/admin/forgot-password/requests";
 const RESET_ENDPOINT = "/api/admin/forgot-password/approve";
 

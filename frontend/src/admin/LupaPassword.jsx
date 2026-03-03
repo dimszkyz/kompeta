@@ -15,7 +15,7 @@ import {
 
 import Header from "../component/header";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 const FORGOT_PW_ENDPOINT = "/api/admin/forgot-password";
 
 /** Notifikasi kecil (success / error) */

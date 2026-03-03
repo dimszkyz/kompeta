@@ -16,7 +16,7 @@ import {
 import DaftarUndangan from "./DaftarUndangan";
 import EmailPengirim from "./EmailPengirim";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 
 // Helper validasi email sederhana
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -37,7 +37,12 @@ const TambahPeserta = () => {
   // --- STATE UNTUK MODAL PENGATURAN EMAIL ---
   const [showEmailSettings, setShowEmailSettings] = useState(false);
 
-  // --- STATE UNTUK NOTIFIKASI (TOAST) ---
+  // --- STATE UNTUK POP-UP KONFIRMASI KIRIM ---
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [smtpServiceName, setSmtpServiceName] = useState("");
+  const [pendingSubmitData, setPendingSubmitData] = useState(null);
+
+  // --- STATE UNTUK NOTIFIKASI ---
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -137,8 +142,8 @@ const TambahPeserta = () => {
     setEmails(emails.filter((_, index) => index !== indexToRemove));
   };
 
-  // --- Handler Kirim Undangan ---
-  const handleSubmit = async (e) => {
+  // --- Tahap 1: Validasi Form & Munculkan Konfirmasi ---
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage("");
     setSuccessMessage("");
@@ -165,7 +170,6 @@ const TambahPeserta = () => {
       if (!finalEmails.includes(finalCurrentEmail)) {
         finalEmails.push(finalCurrentEmail);
       }
-      setCurrentEmail("");
     }
 
     if (!pesan.trim()) {
@@ -178,6 +182,56 @@ const TambahPeserta = () => {
     }
 
     setLoading(true);
+
+    try {
+      // Ambil konfigurasi layanan email saat ini untuk ditampilkan di modal
+      const token = sessionStorage.getItem("adminToken");
+      const res = await fetch(`${API_URL}/api/email/smtp`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/json"
+        },
+      });
+
+      let serviceName = "Tidak Diketahui";
+      if (res.ok) {
+        const data = await res.json();
+        const providers = {
+          "none": "Tanpa Layanan (Simpan ke DB saja)",
+          "bps": "Mail BPS",
+          "gmail": "Google / Gmail",
+          "brevo": "Brevo (Sendinblue)",
+          "mailtrap": "Mailtrap",
+          "custom": "Lainnya (Manual SMTP Hosting)"
+        };
+        // Set nama layanan sesuai mapping atau value aslinya
+        serviceName = providers[data.service] || data.service || "gmail";
+      }
+
+      setSmtpServiceName(serviceName);
+      setPendingSubmitData({ finalEmails, maxLoginsNum, finalCurrentEmail });
+      setShowConfirmModal(true);
+
+    } catch (err) {
+      setErrorMessage("Gagal memeriksa konfigurasi email.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- Tahap 2: Eksekusi Kirim Undangan ---
+  const processSubmit = async () => {
+    // TIDAK menutup konfirmasi di sini agar loading terlihat di modal
+    setLoading(true);
+    setErrorMessage("");
+    
+    const { finalEmails, maxLoginsNum, finalCurrentEmail } = pendingSubmitData;
+
+    // Bersihkan input email satuan jika dimasukkan bersamaan klik submit
+    if (finalCurrentEmail) {
+      setCurrentEmail("");
+    }
 
     try {
       const payload = {
@@ -216,6 +270,7 @@ const TambahPeserta = () => {
         throw new Error(msg);
       }
 
+      setShowConfirmModal(false); // Tutup modal setelah berhasil
       setSuccessMessage(result.message || `Proses pengiriman selesai.`);
       setTimeout(() => setSuccessMessage(""), 7000);
 
@@ -223,39 +278,24 @@ const TambahPeserta = () => {
       setCurrentEmail("");
       setRefreshKey((prevKey) => prevKey + 1);
     } catch (error) {
+      setShowConfirmModal(false); // Tutup modal meskipun error untuk menampilkan toast error
       console.error("Error mengirim undangan:", error);
       setErrorMessage(error.message);
       setTimeout(() => setErrorMessage(""), 7000);
     } finally {
       setLoading(false);
+      setPendingSubmitData(null);
     }
   };
 
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col relative pb-10">
       {/* =========================================
-          AREA NOTIFIKASI / TOAST
+          AREA NOTIFIKASI ERROR (TOAST)
       ========================================== */}
-      <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-xl px-4 flex flex-col gap-2">
-        {successMessage && (
-          <div className="flex justify-between items-start bg-green-100 border border-green-200 text-green-800 px-5 py-3 rounded-lg shadow-lg animate-bounce-in">
-            <div className="flex items-center gap-3">
-              <FaCheckCircle className="text-green-600 w-5 h-5 flex-shrink-0" />
-              <span className="font-semibold text-sm md:text-base leading-snug">
-                {successMessage}
-              </span>
-            </div>
-            <button
-              onClick={() => setSuccessMessage("")}
-              className="text-green-600 hover:text-green-800 ml-3"
-            >
-              <FaTimes />
-            </button>
-          </div>
-        )}
-
+      <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] w-full max-w-xl px-4 flex flex-col gap-2 pointer-events-none">
         {errorMessage && (
-          <div className="flex justify-between items-start bg-red-100 border border-red-200 text-red-800 px-5 py-3 rounded-lg shadow-lg animate-bounce-in">
+          <div className="flex justify-between items-start bg-red-100 border border-red-200 text-red-800 px-5 py-3 rounded-lg shadow-lg animate-bounce-in pointer-events-auto">
             <div className="flex items-center gap-3">
               <FaExclamationCircle className="text-red-600 w-5 h-5 flex-shrink-0" />
               <span className="font-semibold text-sm md:text-base leading-snug">
@@ -300,7 +340,7 @@ const TambahPeserta = () => {
           </div>
 
           <div className="p-4 sm:p-6 md:p-8">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleFormSubmit} className="space-y-6">
               {/* Grid untuk Pilihan Ujian & Batas Login */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-2">
@@ -462,32 +502,22 @@ const TambahPeserta = () => {
                 </div>
               </div>
 
-              {/* Tombol Submit */}
+              {/* Tombol Submit Utama di Form */}
               <div className="pt-2 border-t border-gray-100 flex justify-end">
                 <button
                   type="submit"
                   disabled={
-                    loading ||
                     (emails.length === 0 && !currentEmail.trim()) ||
-                    !selectedExamId
+                    !selectedExamId || loading
                   }
                   className={`flex justify-center items-center gap-2 px-8 py-3 rounded-lg text-white font-semibold shadow-md transition-all ${
-                    loading ||
                     (emails.length === 0 && !currentEmail.trim()) ||
-                    !selectedExamId
+                    !selectedExamId || loading
                       ? "bg-gray-400 cursor-not-allowed"
                       : "bg-blue-600 hover:bg-blue-700 hover:shadow-lg active:scale-95"
                   }`}
                 >
-                  {loading ? (
-                    <>
-                      <FaSyncAlt className="animate-spin" /> Mengirim...
-                    </>
-                  ) : (
-                    <>
-                      <FaPaperPlane /> Kirim Undangan
-                    </>
-                  )}
+                  <FaPaperPlane /> Kirim Undangan
                 </button>
               </div>
             </form>
@@ -499,6 +529,82 @@ const TambahPeserta = () => {
           <DaftarUndangan refreshTrigger={refreshKey} />
         </section>
       </div>
+
+      {/* --- MODAL KONFIRMASI PENGIRIMAN --- */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden transform transition-all animate-fade-in-up">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2 border-b pb-2">Konfirmasi Pengiriman</h3>
+              <p className="text-gray-600 text-sm mt-3">
+                Anda menggunakan konfigurasi layanan kirim undangan:
+              </p>
+              <p className="font-semibold text-blue-700 text-base my-1">
+                {smtpServiceName}
+              </p>
+              <p className="text-gray-600 text-sm mt-3">
+                Yakin ingin melanjutkan?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowConfirmModal(false);
+                    setShowEmailSettings(true);
+                  }}
+                  disabled={loading}
+                  className="text-blue-600 hover:text-blue-800 underline font-medium ml-1 disabled:text-gray-400"
+                >
+                  ubah
+                </button>
+              </p>
+            </div>
+            <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={loading}
+                className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium transition disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={processSubmit}
+                disabled={loading}
+                className={`px-4 py-2 text-white rounded-lg font-medium transition flex items-center gap-2 ${
+                  loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                {loading ? (
+                  <><FaSyncAlt className="animate-spin" /> Mengirim...</>
+                ) : (
+                  <><FaPaperPlane /> Ya, Lanjutkan</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL SUKSES (POP-UP TENGAH LAYAR) --- */}
+      {successMessage && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all animate-bounce-in text-center p-6 relative">
+            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+              <FaCheckCircle className="h-10 w-10 text-green-600" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Berhasil!</h3>
+            <p className="text-gray-600 text-sm mb-6 leading-relaxed">
+              {successMessage}
+            </p>
+            <button
+              onClick={() => setSuccessMessage("")}
+              className="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors duration-200"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* --- MODAL PENGATURAN EMAIL --- */}
       {showEmailSettings && (

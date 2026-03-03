@@ -6,7 +6,7 @@ import ReCAPTCHA from "react-google-recaptcha";
 import { jwtDecode } from "jwt-decode"; // Pastikan import ini ada
 import Header from "../component/header";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 const SITE_KEY = "6LfRKwwsAAAAAE-gjwO95HkRq62ke8WCGxs0P_Fh";
 const defaultBgAdmin = "bg-gray-50";
 

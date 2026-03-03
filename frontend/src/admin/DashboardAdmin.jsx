@@ -11,42 +11,8 @@ import {
   FaFileAlt,
 } from "react-icons/fa";
 
-const API_URL = "http://localhost:8000";
-
-// ------------------------------------------------------------------
-// HELPER DARI HasilUjian.jsx
-// ------------------------------------------------------------------
-const groupDataByPeserta = (data) => {
-  const grouped = data.reduce((acc, row) => {
-    const id = row.peserta_id;
-    if (!acc[id]) {
-      acc[id] = {
-        peserta_id: id,
-        nama: row.nama,
-        pg_benar: 0,
-        total_pg: 0,
-      };
-    }
-    if (row.tipe_soal === "pilihanGanda") {
-      acc[id].total_pg += 1;
-      if (row.benar) {
-        acc[id].pg_benar += 1;
-      }
-    }
-    return acc;
-  }, {});
-
-  return Object.values(grouped).map((peserta) => {
-    const skor_pg =
-      peserta.total_pg > 0
-        ? ((peserta.pg_benar / peserta.total_pg) * 100).toFixed(0)
-        : 0;
-    return {
-      ...peserta,
-      skor_pg: skor_pg,
-    };
-  });
-};
+const API_URL = "https://kompeta.web.bps.go.id";
+const CACHE_KEY = "dashboard_data_cache"; // Kunci untuk penyimpanan cache sementara
 
 // ------------------------------------------------------------------
 // HELPER DARI DaftarSoal.jsx
@@ -68,9 +34,9 @@ const formatTanggal = (tgl) => {
 };
 
 // ------------------------------------------------------------------
-// KOMPONEN KARTU STATISTIK (Reusable & Responsive)
+// KOMPONEN KARTU STATISTIK (Ditambah prop loading untuk Skeleton)
 // ------------------------------------------------------------------
-const StatCard = ({ icon, label, value, to, color }) => (
+const StatCard = ({ icon, label, value, to, color, loading }) => (
   <Link
     to={to}
     className={`bg-white p-4 md:p-5 rounded-xl shadow-md border-l-4 ${color} transition-all hover:shadow-lg hover:scale-[1.02] block`}
@@ -78,16 +44,19 @@ const StatCard = ({ icon, label, value, to, color }) => (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
         <div className="p-2 md:p-3 rounded-full bg-gray-100 flex-shrink-0">
-          {/* Icon size adjustment for mobile */}
           <div className="text-xl md:text-2xl">{icon}</div>
         </div>
         <div className="min-w-0">
           <p className="text-xs md:text-sm font-medium text-gray-500 truncate">
             {label}
           </p>
-          <p className="text-2xl md:text-3xl font-bold text-gray-900 truncate">
-            {value}
-          </p>
+          {loading ? (
+            <div className="h-7 md:h-9 bg-gray-200 rounded animate-pulse w-16 mt-1"></div>
+          ) : (
+            <p className="text-2xl md:text-3xl font-bold text-gray-900 truncate">
+              {value}
+            </p>
+          )}
         </div>
       </div>
       <FaArrowRight className="text-gray-400 text-sm md:text-base flex-shrink-0" />
@@ -99,106 +68,58 @@ const StatCard = ({ icon, label, value, to, color }) => (
 // KOMPONEN UTAMA DASHBOARD
 // ------------------------------------------------------------------
 const DashboardAdmin = () => {
+  // 1. Inisialisasi state dari Cache (jika ada)
+  const getCachedData = () => {
+    const cached = sessionStorage.getItem(CACHE_KEY);
+    return cached ? JSON.parse(cached) : null;
+  };
+
+  const cachedData = getCachedData();
+
   const [stats, setStats] = useState({
-    totalUjian: 0,
-    totalPeserta: 0,
-    totalUndangan: 0,
+    totalUjian: cachedData?.totalUjian ?? 0,
+    totalPeserta: cachedData?.totalPeserta ?? 0,
+    totalUndangan: cachedData?.totalUndangan ?? 0,
   });
-  const [recentUjian, setRecentUjian] = useState([]);
-  const [recentHasil, setRecentHasil] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [recentUjian, setRecentUjian] = useState(cachedData?.recentUjian ?? []);
+  const [recentHasil, setRecentHasil] = useState(cachedData?.recentHasil ?? []);
+  
+  // loading = true HANYA jika tidak ada cache (pertama kali load halaman)
+  const [loading, setLoading] = useState(!cachedData);
+  // isFetching = true untuk indikator sinkronisasi di background
+  const [isFetching, setIsFetching] = useState(false);
 
   // ============================
-  // FETCH DATA
+  // FETCH DATA TUNGGAL
   // ============================
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    setIsFetching(true);
     try {
       const token = sessionStorage.getItem("adminToken");
-      if (!token) {
-        console.error("Token admin tidak ditemukan di sessionStorage.");
-        return;
-      }
+      if (!token) return;
 
-      let adminId = null;
-      try {
-        const adminData = JSON.parse(
-          sessionStorage.getItem("adminData") || "{}"
-        );
-        adminId = adminData?.id;
-      } catch (e) {
-        console.error("adminData rusak / bukan JSON:", e);
-      }
+      const res = await fetch(`${API_URL}/api/dashboard/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-      if (!adminId) {
-        console.error(
-          "Admin ID tidak ditemukan. Cek adminData di sessionStorage."
-        );
-        return;
-      }
-
-      const headers = { Authorization: `Bearer ${token}` };
-
-      const [resUjian, resHasil, resUndangan] = await Promise.allSettled([
-        fetch(`${API_URL}/api/ujian`, { headers }),
-        fetch(`${API_URL}/api/hasil`, { headers }),
-        fetch(`${API_URL}/api/invite/list`, { headers }),
-      ]);
-
-      let totalUjian = 0,
-        totalPeserta = 0,
-        totalUndangan = 0,
-        listUjian = [],
-        listHasil = [];
-
-      let myUjianAll = [];
-
-      // ---------------- UJIAN ----------------
-      if (resUjian.status === "fulfilled" && resUjian.value.ok) {
-        const dataUjian = await resUjian.value.json();
-        myUjianAll = dataUjian.filter(
-          (u) => Number(u.admin_id) === Number(adminId)
-        );
-        totalUjian = myUjianAll.length;
-        listUjian = [...myUjianAll]
-          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-          .slice(0, 5);
-      }
-
-      // ---------------- HASIL ----------------
-      if (resHasil.status === "fulfilled" && resHasil.value.ok) {
-        const dataHasil = await resHasil.value.json();
-        const myExamIds = new Set(myUjianAll.map((u) => Number(u.id)));
-
-        const myHasilRaw = dataHasil.filter((row) => {
-          if (row.admin_id != null) {
-            return Number(row.admin_id) === Number(adminId);
-          }
-          if (row.exam_id != null) {
-            return myExamIds.has(Number(row.exam_id));
-          }
-          return false;
+      if (res.ok) {
+        const data = await res.json();
+        setStats({
+          totalUjian: data.totalUjian,
+          totalPeserta: data.totalPeserta,
+          totalUndangan: data.totalUndangan,
         });
+        setRecentUjian(data.recentUjian || []);
+        setRecentHasil(data.recentHasil || []);
 
-        const groupedData = groupDataByPeserta(myHasilRaw);
-        totalPeserta = groupedData.length;
-        listHasil = groupedData.slice(-5).reverse();
+        // Simpan data terbaru ke cache
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
       }
-
-      // ---------------- UNDANGAN ----------------
-      if (resUndangan.status === "fulfilled" && resUndangan.value.ok) {
-        const dataUndangan = await resUndangan.value.json();
-        totalUndangan = dataUndangan.length; 
-      }
-
-      setStats({ totalUjian, totalPeserta, totalUndangan });
-      setRecentUjian(listUjian);
-      setRecentHasil(listHasil);
     } catch (err) {
       console.error("Gagal memuat data dashboard:", err);
-      alert("Gagal memuat data dashboard.");
     } finally {
       setLoading(false);
+      setIsFetching(false);
     }
   }, []);
 
@@ -206,25 +127,25 @@ const DashboardAdmin = () => {
     fetchData();
   }, [fetchData]);
 
-  if (loading) {
-    return (
-      <div className="bg-gray-50 min-h-screen flex justify-center items-center">
-        <FaSyncAlt className="animate-spin text-4xl text-blue-600" />
-      </div>
-    );
-  }
+  // Hapus global loading spinner agar layout langsung tampil
+  // if (loading) return <Spinner/> dihapus.
 
   return (
     <>
       <div className="bg-gray-50 min-h-screen flex flex-col font-sans">
         {/* 1. HEADER */}
-        <div className="bg-white shadow-sm border-b border-gray-300 py-4 pl-14 pr-4 md:px-8 md:py-5 sticky top-0 z-50 transition-all">
+        <div className="bg-white shadow-sm border-b border-gray-300 py-4 pl-14 pr-4 md:px-8 md:py-5 sticky top-0 z-50 transition-all flex justify-between items-center">
           <h2 className="text-xl md:text-2xl font-semibold text-gray-900 flex items-center gap-2">
-            {/* ICON DIBUNGKUS, NANTI DIHIDE DI MOBILE VIA CSS */}
             <span className="dashboard-header-icon inline-flex">
               <FaTachometerAlt className="text-blue-600 w-5 h-5 md:w-6 md:h-6" />
             </span>
             Dashboard Admin
+            {isFetching && (
+              <FaSyncAlt 
+                className="text-gray-400 text-sm md:text-base animate-spin ml-2" 
+                title="Menyinkronkan data..." 
+              />
+            )}
           </h2>
         </div>
 
@@ -239,6 +160,7 @@ const DashboardAdmin = () => {
                 value={stats.totalUjian}
                 color="border-blue-500"
                 icon={<FaListUl className="text-blue-500" />}
+                loading={loading}
               />
               <StatCard
                 to="/admin/hasil-ujian"
@@ -246,6 +168,7 @@ const DashboardAdmin = () => {
                 value={stats.totalPeserta}
                 color="border-green-500"
                 icon={<FaUsers className="text-green-500" />}
+                loading={loading}
               />
               <StatCard
                 to="/admin/tambah-peserta"
@@ -253,6 +176,7 @@ const DashboardAdmin = () => {
                 value={stats.totalUndangan}
                 color="border-yellow-500"
                 icon={<FaPaperPlane className="text-yellow-500" />}
+                loading={loading}
               />
             </div>
 
@@ -308,7 +232,18 @@ const DashboardAdmin = () => {
                   </Link>
                 </div>
                 <div className="space-y-3 dashboard-card-list">
-                  {recentUjian.length > 0 ? (
+                  {loading ? (
+                    // Efek Skeleton saat load pertama kali
+                    [...Array(3)].map((_, i) => (
+                      <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="h-5 bg-gray-200 rounded animate-pulse w-3/4 mb-1"></div>
+                          <div className="h-4 bg-gray-200 rounded animate-pulse w-1/3"></div>
+                        </div>
+                        <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse flex-shrink-0"></div>
+                      </div>
+                    ))
+                  ) : recentUjian.length > 0 ? (
                     recentUjian.map((ujian) => (
                       <div
                         key={ujian.id}
@@ -353,7 +288,18 @@ const DashboardAdmin = () => {
                   </Link>
                 </div>
                 <div className="space-y-3 dashboard-card-list">
-                  {recentHasil.length > 0 ? (
+                  {loading ? (
+                     // Efek Skeleton saat load pertama kali
+                     [...Array(3)].map((_, i) => (
+                      <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="h-5 bg-gray-200 rounded animate-pulse w-3/4 mb-1"></div>
+                          <div className="h-4 bg-gray-200 rounded animate-pulse w-1/4"></div>
+                        </div>
+                        <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse flex-shrink-0"></div>
+                      </div>
+                    ))
+                  ) : recentHasil.length > 0 ? (
                     recentHasil.map((hasil) => (
                       <div
                         key={hasil.peserta_id}

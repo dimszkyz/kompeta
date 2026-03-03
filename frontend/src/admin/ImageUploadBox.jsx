@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 // Impor yang tidak terpakai (FaImage, FaSpinner) telah dihapus
 import { FaUpload, FaTimes } from "react-icons/fa";
 
-const API_URL = "http://localhost:8000"; // Sesuaikan API URL Anda
+const API_URL = "https://kompeta.web.bps.go.id"; // Sesuaikan API URL Anda
 
 const ImageUploadBox = ({ value, onChange, onReset, defaultBgClass }) => {
   const [isDragging, setIsDragging] = useState(false);

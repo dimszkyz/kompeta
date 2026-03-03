@@ -46,6 +46,7 @@ Route::post('/hasil', [HasilController::class, 'store']);
 */
 Route::middleware(['auth:sanctum'])->group(function () {
 
+    Route::get('/dashboard/stats', [AdminController::class, 'dashboardStats']);
     Route::get('/auth/admin/me', [AuthController::class, 'me']);
     Route::post('/auth/admin/logout', [AuthController::class, 'logout']);
     Route::get('/admin/ping', [AdminController::class, 'ping']);

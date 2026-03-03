@@ -14,7 +14,7 @@ import {
 } from "react-icons/fa";
 import ImageUploadBox from "./ImageUploadBox";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 
 /** Komponen Notifikasi Halaman */
 const PageAlert = ({ type, text, onClose }) => {

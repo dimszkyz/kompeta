@@ -20,7 +20,7 @@ import {
 // import * as XLSX from "xlsx";
 import { XLSXAdapter as XLSX } from "../utils/excelAdapter";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 
 // ---------- Helpers ----------
 

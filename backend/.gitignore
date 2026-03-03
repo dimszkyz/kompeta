@@ -22,3 +22,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# ZAP Scanner hidden files block
+.darcs
+._darcs

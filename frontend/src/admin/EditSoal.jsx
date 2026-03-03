@@ -21,7 +21,7 @@ import {
   downloadWorkbook,
 } from "../admin/TemplateExcel"; // Pastikan path import ini benar sesuai struktur folder Anda
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 
 // =======================================================
 // KONFIGURASI TIPE FILE (SAMA DENGAN TambahSoal.jsx)
@@ -462,18 +462,19 @@ const EditSoal = () => {
 
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col pb-10">
-      {/* NOTIFIKASI SUKSES */}
+      {/* --- MODAL SUKSES (POP-UP TENGAH LAYAR) --- */}
       {successMessage && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] w-[90%] md:w-full max-w-lg px-2 sm:px-4 transition-all duration-300">
-          <div className="flex items-center justify-between gap-4 bg-green-600 text-white px-5 py-4 rounded-xl shadow-2xl animate-bounce-in border border-green-500 backdrop-blur-sm bg-opacity-95">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <FaCheckCircle className="text-white w-6 h-6 flex-shrink-0" />
-              <span className="font-semibold text-sm md:text-base truncate">
-                {successMessage}
-              </span>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all animate-bounce-in text-center p-6 relative">
+            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+              <FaCheckCircle className="h-10 w-10 text-green-600" />
             </div>
-            <div className="flex items-center gap-2 pl-2 border-l border-green-400/50">
-              <FaSpinner className="w-5 h-5 text-white animate-spin flex-shrink-0" />
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Berhasil!</h3>
+            <p className="text-gray-600 text-sm mb-4 leading-relaxed">
+              {successMessage}
+            </p>
+            <div className="flex justify-center mt-2">
+              <FaSpinner className="w-6 h-6 text-blue-600 animate-spin" />
             </div>
           </div>
         </div>

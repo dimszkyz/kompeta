@@ -13,7 +13,7 @@ import {
   FaSpinner,
 } from "react-icons/fa";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 
 const PartPeserta = () => {
   const navigate = useNavigate();
@@ -22,6 +22,12 @@ const PartPeserta = () => {
     nama: "",
     nohp: "",
     email: "",
+  });
+
+  // Tambahkan state untuk menyimpan pesan error
+  const [errors, setErrors] = useState({
+    nama: "",
+    nohp: "",
   });
 
   const [pesertaId, setPesertaId] = useState(null);
@@ -62,18 +68,73 @@ const PartPeserta = () => {
     }
   }, [navigate]);
 
+  // Modifikasi handleChange untuk validasi real-time
   const handleChange = (e) => {
     const { name, value } = e.target;
+    let newErrors = { ...errors };
+
+    if (name === "nama") {
+      // Cek jika mengandung angka
+      if (/\d/.test(value)) {
+        newErrors.nama = "Nama tidak boleh mengandung angka.";
+      } else {
+        newErrors.nama = "";
+      }
+    }
+
+    if (name === "nohp") {
+      // Blokir input jika bukan angka
+      if (value !== "" && !/^\d+$/.test(value)) {
+        return; // Jangan update state form jika karakter yang diketik bukan angka
+      }
+      
+      // Validasi panjang digit
+      if (value.length > 0 && (value.length < 8 || value.length > 13)) {
+        newErrors.nohp = "No HP harus terdiri dari 8-13 digit angka.";
+      } else {
+        newErrors.nohp = "";
+      }
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }));
+    setErrors(newErrors);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.nama.trim() || !form.nohp.trim() || !form.email.trim()) {
-      alert("Semua kolom wajib diisi.");
+    let valid = true;
+    let newErrors = { nama: "", nohp: "" };
+
+    // Validasi final sebelum submit
+    if (!form.nama.trim()) {
+      newErrors.nama = "Nama wajib diisi.";
+      valid = false;
+    } else if (/\d/.test(form.nama)) {
+      newErrors.nama = "Nama tidak boleh mengandung angka.";
+      valid = false;
+    }
+
+    if (!form.nohp.trim()) {
+      newErrors.nohp = "No HP wajib diisi.";
+      valid = false;
+    } else if (!/^\d{8,13}$/.test(form.nohp)) {
+      newErrors.nohp = "No HP harus berupa angka dengan panjang 8-13 digit.";
+      valid = false;
+    }
+
+    if (!form.email.trim()) {
+      alert("Email wajib diisi.");
+      valid = false;
+    }
+
+    setErrors(newErrors);
+
+    // Hentikan proses jika ada error
+    if (!valid) {
       return;
     }
+
     setSubmitted(true);
   };
 
@@ -98,7 +159,6 @@ const PartPeserta = () => {
 
       const payload = { ...form };
 
-      // [FIX] Tambahkan header Accept: application/json agar server melempar error dalam format JSON
       if (finalPesertaId) {
         res = await fetch(`${API_URL}/api/peserta/${finalPesertaId}`, {
           method: "PUT",
@@ -121,7 +181,6 @@ const PartPeserta = () => {
 
       const data = await res.json();
       
-      // Tangkap error validasi atau server error
       if (!res.ok) {
         throw new Error(data.message || data.error || "Gagal menyimpan data peserta.");
       }
@@ -148,14 +207,8 @@ const PartPeserta = () => {
       }
 
       const examId = loginData.examId;
-      const resUjian = await fetch(`${API_URL}/api/ujian/check-active/${examId}`);
-      const ujianData = await resUjian.json();
+      navigate(`/ujian/${examId}`);
 
-      if (!resUjian.ok) {
-        throw new Error(ujianData.message || "Gagal memverifikasi ujian.");
-      }
-
-      navigate(`/ujian/${ujianData.id}`);
     } catch (err) {
       setPopup({
         isOpen: true,
@@ -202,11 +255,15 @@ const PartPeserta = () => {
                       name="nama"
                       value={form.nama}
                       onChange={handleChange}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 sm:text-sm"
+                      className={`block w-full pl-10 pr-3 py-3 border ${errors.nama ? 'border-red-500' : 'border-gray-300'} rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 ${errors.nama ? 'focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-blue-500/20 focus:border-blue-500'} transition-all duration-200 sm:text-sm`}
                       placeholder="Masukan Nama Anda Disini"
                       required
                     />
                   </div>
+                  {/* Tampilkan pesan error jika ada */}
+                  {errors.nama && (
+                    <p className="text-red-500 text-xs mt-1">{errors.nama}</p>
+                  )}
                 </div>
 
                 {/* No HP */}
@@ -223,11 +280,16 @@ const PartPeserta = () => {
                       name="nohp"
                       value={form.nohp}
                       onChange={handleChange}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 sm:text-sm"
+                      maxLength={13}
+                      className={`block w-full pl-10 pr-3 py-3 border ${errors.nohp ? 'border-red-500' : 'border-gray-300'} rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 ${errors.nohp ? 'focus:ring-red-500/20 focus:border-red-500' : 'focus:ring-blue-500/20 focus:border-blue-500'} transition-all duration-200 sm:text-sm`}
                       placeholder="Masukan Nomor Anda Disini"
                       required
                     />
                   </div>
+                  {/* Tampilkan pesan error jika ada */}
+                  {errors.nohp && (
+                    <p className="text-red-500 text-xs mt-1">{errors.nohp}</p>
+                  )}
                 </div>
 
                 {/* Email (Read-Only) */}
@@ -314,10 +376,11 @@ const PartPeserta = () => {
                   <button
                     onClick={handleMulaiUjian}
                     disabled={isSaving}
-                    className={`w-full flex justify-center items-center gap-2 py-3.5 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ${isSaving
+                    className={`w-full flex justify-center items-center gap-2 py-3.5 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ${
+                      isSaving
                         ? "bg-green-300 cursor-not-allowed"
                         : "bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                      }`}
+                    }`}
                   >
                     {isSaving ? (
                       <FaSpinner className="animate-spin" />

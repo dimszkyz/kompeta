@@ -16,7 +16,7 @@ import { jwtDecode } from "jwt-decode";
 import PermintaanResetPassword from "./PermintaanResetPassword";
 import EmailPengirim from "./EmailPengirim";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 const CHANGE_PW_ENDPOINT = "/api/admin/change-password";
 
 // Komponen Pesan Notifikasi (Memoized)

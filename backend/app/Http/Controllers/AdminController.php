@@ -231,4 +231,92 @@ class AdminController extends Controller
 
         return response()->json(['message' => 'Password berhasil diubah.']);
     }
+
+    // ==============================================================
+    // TAMBAHAN BARU: FUNGSI UNTUK MENGAMBIL STATISTIK DASHBOARD
+    // ==============================================================
+    public function dashboardStats(Request $request)
+    {
+        $user = $request->user();
+        $adminId = $user->id;
+
+        // 1. Total Ujian
+        $totalUjian = DB::table('exams')
+            ->where('admin_id', $adminId)
+            ->where('is_deleted', false)
+            ->count();
+
+        // 2. Total Undangan
+        $totalUndangan = DB::table('invitations')
+            ->where('admin_id', $adminId)
+            ->count();
+
+        // 3. Total Peserta (Hanya hitung peserta yang mengerjakan ujian milik admin ini)
+        $totalPeserta = DB::table('hasil_ujian')
+            ->join('exams', 'exams.id', '=', 'hasil_ujian.exam_id')
+            ->where('exams.admin_id', $adminId)
+            ->distinct('hasil_ujian.peserta_id')
+            ->count('hasil_ujian.peserta_id');
+
+        // 4. Ambil 5 Ujian Terbaru
+        $recentUjian = DB::table('exams')
+            ->select('id', 'keterangan', 'tanggal')
+            ->where('admin_id', $adminId)
+            ->where('is_deleted', false)
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get();
+
+        // 5. Ambil 5 Hasil Terbaru & Hitung Skor PG nya langsung
+        $recentPesertaIds = DB::table('hasil_ujian')
+            ->join('exams', 'exams.id', '=', 'hasil_ujian.exam_id')
+            ->where('exams.admin_id', $adminId)
+            ->select('hasil_ujian.peserta_id', DB::raw('MAX(hasil_ujian.created_at) as submitted_at'))
+            ->groupBy('hasil_ujian.peserta_id')
+            ->orderBy('submitted_at', 'desc')
+            ->take(5)
+            ->pluck('peserta_id');
+
+        $recentHasil = [];
+        if ($recentPesertaIds->isNotEmpty()) {
+            $rawHasil = DB::table('hasil_ujian as h')
+                ->join('peserta as p', 'p.id', '=', 'h.peserta_id')
+                ->join('questions as q', 'q.id', '=', 'h.question_id')
+                ->whereIn('h.peserta_id', $recentPesertaIds)
+                ->select('p.id as peserta_id', 'p.nama', 'h.benar', 'q.tipe_soal')
+                ->get();
+
+            $grouped = [];
+            foreach ($rawHasil as $row) {
+                $pid = $row->peserta_id;
+                if (!isset($grouped[$pid])) {
+                    $grouped[$pid] = ['peserta_id' => $pid, 'nama' => $row->nama, 'pg_benar' => 0, 'total_pg' => 0];
+                }
+                if (in_array($row->tipe_soal, ['pilihanGanda', 'pilihan_ganda'])) {
+                    $grouped[$pid]['total_pg']++;
+                    if ($row->benar) $grouped[$pid]['pg_benar']++;
+                }
+            }
+
+            foreach ($recentPesertaIds as $pid) {
+                if(isset($grouped[$pid])) {
+                    $g = $grouped[$pid];
+                    $skor = $g['total_pg'] > 0 ? round(($g['pg_benar'] / $g['total_pg']) * 100) : 0;
+                    $recentHasil[] = [
+                        'peserta_id' => $g['peserta_id'],
+                        'nama' => $g['nama'],
+                        'skor_pg' => $skor
+                    ];
+                }
+            }
+        }
+
+        return response()->json([
+            'totalUjian' => $totalUjian,
+            'totalPeserta' => $totalPeserta,
+            'totalUndangan' => $totalUndangan,
+            'recentUjian' => $recentUjian,
+            'recentHasil' => $recentHasil
+        ]);
+    }
 }

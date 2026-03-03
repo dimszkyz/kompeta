@@ -166,9 +166,22 @@ class HasilController extends Controller
             $query->where('e.admin_id', $user->id);
         }
 
+        // KEMBALIKAN KE GET() agar Frontend Anda tidak error
         $rows = $query->orderBy('e.id')->orderBy('p.id')->orderBy('q.id')->get();
 
-        $normalized = $rows->map(function ($row) {
+        // --- OPTIMASI SUPER CEPAT (Menghilangkan N+1 Query) ---
+        // 1. Ambil semua ID soal dari hasil yang didapat
+        $questionIds = $rows->pluck('question_id')->unique();
+        
+        // 2. Load semua kunci jawaban dalam SATU KALI query saja
+        $kunciJawabanData = DB::table('options')
+            ->whereIn('question_id', $questionIds)
+            ->where('is_correct', true)
+            ->select('question_id', 'opsi_text')
+            ->get()
+            ->groupBy('question_id');
+
+        $normalized = $rows->map(function ($row) use ($kunciJawabanData) {
             if ($row->tipe_soal === 'soalDokumen') {
                 $files = [];
                 try {
@@ -177,7 +190,6 @@ class HasilController extends Controller
 
                     foreach ($rawPaths as $path) {
                         $cleanPath = ltrim(str_replace('storage/', '', $path), '/');
-                        // Hasil: https://kompeta.web.bps.go.id/storage/uploads_jawaban/xxx.jpg
                         $files[] = '/storage/' . $cleanPath;
                     }
                 } catch (\Exception $e) {
@@ -188,10 +200,11 @@ class HasilController extends Controller
                 $row->jawaban_text = $files[0] ?? null;
             }
 
-            $kunci = Option::where('question_id', $row->question_id)
-                ->where('is_correct', true)
-                ->pluck('opsi_text')
-                ->implode(', ');
+            // 3. Ambil data langsung dari variabel memori tanpa koneksi ke database lagi
+            $kunci = '';
+            if ($kunciJawabanData->has($row->question_id)) {
+                $kunci = $kunciJawabanData->get($row->question_id)->pluck('opsi_text')->implode(', ');
+            }
             $row->kunci_jawaban_text = $kunci;
 
             return $row;
@@ -236,21 +249,28 @@ class HasilController extends Controller
             return response()->json(['message' => 'Hasil ujian tidak ditemukan'], 404);
         }
 
+        // --- OPTIMASI KEDUA UNTUK HALAMAN DETAIL AKHIR ---
+        $questionIds = $rows->pluck('question_id')->unique();
+        $allOptions = Option::whereIn('question_id', $questionIds)
+            ->select('id', 'question_id', 'opsi_text', 'is_correct')
+            ->get()
+            ->groupBy('question_id');
+
         foreach ($rows as $row) {
             $row->pilihan = [];
             if (in_array($row->tipe_soal, ['pilihanGanda', 'pilihan_ganda', 'teksSingkat', 'tekssingkat'])) {
-                $options = Option::where('question_id', $row->question_id)
-                    ->select('id', 'opsi_text', 'is_correct')
-                    ->get();
-
-                $row->pilihan = $options->map(function ($opt) {
-                    return [
-                        'id' => $opt->id,
-                        'text' => $opt->opsi_text,
-                        'opsi_text' => $opt->opsi_text, 
-                        'is_correct' => (bool)$opt->is_correct
-                    ];
-                });
+                // Ambil dari variabel, hilangkan N+1 Query
+                if ($allOptions->has($row->question_id)) {
+                    $options = $allOptions->get($row->question_id);
+                    $row->pilihan = $options->map(function ($opt) {
+                        return [
+                            'id' => $opt->id,
+                            'text' => $opt->opsi_text,
+                            'opsi_text' => $opt->opsi_text, 
+                            'is_correct' => (bool)$opt->is_correct
+                        ];
+                    });
+                }
             }
 
             if ($row->tipe_soal === 'soalDokumen') {

@@ -23,7 +23,7 @@ import {
 } from "react-icons/fa";
 import SubmitUjianModal from "../component/submitujian.jsx";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 
 // --- FUNGSI SHUFFLE ---
 const shuffleArray = (array) => {
@@ -344,7 +344,7 @@ const PartSoal = () => {
       try {
         setLoading(true);
 
-        const res = await fetch(`${API_URL}/api/ujian/publik/${id}`);
+        const res = await fetch(`${API_URL}/api/ujian/public/${id}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || "Gagal memuat ujian.");
 

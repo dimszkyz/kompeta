@@ -17,7 +17,7 @@ import {
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 
 // ===============================================
 // ▼▼▼ KOMPONEN MODAL KONFIRMASI ▼▼▼
@@ -88,7 +88,7 @@ const DaftarSoal = () => {
   const [pageSize, setPageSize] = useState(getInitialPageSize);
 
   // =============================
-  // Helper tanggal
+  // Helper tanggal & waktu
   // =============================
   const pad2 = (n) => String(n).padStart(2, "0");
 
@@ -110,6 +110,11 @@ const DaftarSoal = () => {
     return `${d}-${m}-${y}`;
   };
 
+  const formatJam = (jam) => {
+    if (!jam) return "--:--";
+    return jam.substring(0, 5);
+  };
+
   // =============================
   // Helper Error Handler
   // =============================
@@ -119,21 +124,10 @@ const DaftarSoal = () => {
     // Jika akun dinonaktifkan, biarkan main.jsx yang handle
     if (err.message === "Akun Anda telah dinonaktifkan.") return;
 
-    // --- MODIFIKASI: JANGAN LANGSUNG LEMPAR DULU ---
-    // Cukup tampilkan pesan error, jangan hapus storage otomatis
-    // Kecuali Anda yakin 100% token benar-benar mati.
-    
     if (
       err.message.includes("Token tidak valid") ||
       err.message.includes("Sesi telah berakhir")
     ) {
-       // Opsional: Tampilkan notifikasi "Sesi habis" tapi jangan navigate paksa dulu
-       // untuk debugging. Jika sudah fix, boleh di-uncomment.
-       
-       // sessionStorage.removeItem("adminToken");
-       // sessionStorage.removeItem("adminData");
-       // navigate("/admin/login");
-       
        setErrorMessage("Sesi backend menolak token. Coba refresh halaman.");
        return;
     }
@@ -141,6 +135,7 @@ const DaftarSoal = () => {
     setErrorMessage(err.message || "Terjadi kesalahan.");
     setTimeout(() => setErrorMessage(""), 4000);
   };
+  
   // =============================
   // Ambil semua ujian
   // =============================
@@ -579,9 +574,7 @@ const DaftarSoal = () => {
                     <div className="flex items-center gap-2">
                       <FaClock className="w-3.5 h-3.5 text-gray-400" />
                       <span>
-                        {(u.jam_mulai || "--:--") +
-                          " – " +
-                          (u.jam_berakhir || "--:--")}
+                        {formatJam(u.jam_mulai)} – {formatJam(u.jam_berakhir)} WIB
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -670,9 +663,7 @@ const DaftarSoal = () => {
                               Jendela Waktu
                             </span>
                             <span>
-                              {(u.jam_mulai || "--:--") +
-                                " – " +
-                                (u.jam_berakhir || "--:--")}
+                              {formatJam(u.jam_mulai)} – {formatJam(u.jam_berakhir)} WIB
                             </span>
                           </div>
                         </div>
@@ -764,9 +755,7 @@ const DaftarSoal = () => {
                         </td>
 
                         <td className="py-3 px-5 whitespace-nowrap border border-gray-200">
-                          {(u.jam_mulai || "--:--") +
-                            " – " +
-                            (u.jam_berakhir || "--:--")}
+                          {formatJam(u.jam_mulai)} – {formatJam(u.jam_berakhir)} WIB
                         </td>
 
                         <td className="py-3 px-5 whitespace-nowrap border border-gray-200">

@@ -14,7 +14,7 @@ import {
   FaThumbsDown
 } from "react-icons/fa";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://kompeta.web.bps.go.id";
 
 const formatTanggal = (isoString) => {
   if (!isoString) return "-";
@@ -469,9 +469,9 @@ const HasilAkhir = () => {
                 pgAnswers.map((jawaban, idx) => {
                     const isBenar = jawaban.benar == 1 || jawaban.benar === true || jawaban.benar === "true";
                     return (
-                        <button
-                            key={jawaban.question_id}
-                            onClick={() => handleBukaModal(jawaban, idx + 1)}
+                    <button
+                        key={`${jawaban.question_id}-${idx}`}
+                        onClick={() => handleBukaModal(jawaban, idx + 1)}
                             className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold text-sm shadow-sm transition-all hover:shadow-lg hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50
                             ${
                                 isBenar
@@ -502,10 +502,10 @@ const HasilAkhir = () => {
                     const isBenar = jawaban.benar == 1 || jawaban.benar === true || jawaban.benar === "true";
                     
                     return (
-                        <div
-                            key={jawaban.question_id}
-                            className="border-b border-gray-200 pb-4 last:border-b-0"
-                        >
+                    <div
+                        key={`${jawaban.question_id}-${idx}`}
+                        className="border-b border-gray-200 pb-4 last:border-b-0"
+                    >
                             <div className="flex justify-between items-start">
                                 <div className="flex-1 pr-4">
                                     <p className="text-xs font-semibold text-gray-500 mb-1">
@@ -571,10 +571,10 @@ const HasilAkhir = () => {
                   const isBenar = jawaban.benar == 1 || jawaban.benar === true || jawaban.benar === "true";
 
                   return (
-                    <div
-                      key={jawaban.question_id}
-                      className="border-b border-gray-200 pb-4 last:border-b-0"
-                    >
+                <div
+                  key={`${jawaban.question_id}-${idx}`}
+                  className="border-b border-gray-200 pb-4 last:border-b-0"
+                >
                       <div className="flex justify-between items-start">
                           <div className="flex-1 pr-4">
                               <p className="text-xs font-semibold text-gray-500 mb-1">
